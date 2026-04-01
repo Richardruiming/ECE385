@@ -9,7 +9,7 @@
 //Used for simulation of AXI4-Lite bus as well as generating
 //simulation video image for testing
 
-//`define SIM_VIDEO //Comment out to simulate AXI bus only
+`define SIM_VIDEO //Comment out to simulate AXI bus only
                     //Uncomment to simulate entire screen and write BMP (slow)
 
 module hdmi_text_controller_tb();
@@ -99,7 +99,8 @@ module hdmi_text_controller_tb();
 	initial begin: CLOCK_INITIALIZATION
 	   aclk = 1'b1;
     end 
-       
+    
+    // 100MHz clk signal
     always begin : CLOCK_GENERATION
         #5 aclk = ~aclk;
     end
@@ -111,19 +112,42 @@ module hdmi_text_controller_tb();
     //the pixel clock, assign pixel_clk = hdmi_text_controller_v1_0_inst.clk_25MHz
     
     // Red Green and Blue values respectively - these come from your draw logic
-    // assign pixel_rgb[0] = 
-    // assign pixel_rgb[1] =
-    // assign pixel_rgb[2] = 
+     assign pixel_rgb[0] = hdmi_text_controller_v1_0_inst.red;
+     assign pixel_rgb[1] = hdmi_text_controller_v1_0_inst.green;
+     assign pixel_rgb[2] = hdmi_text_controller_v1_0_inst.blue;
     
     // Pixel clock, hs, vs, and vde (!blank) - these come from your internal VGA module
-    // assign pixel_clk = 
-    // assign pixel_hs = 
-    // assign pixel_vs = 
-    // assign pixel_vde = 
+     assign pixel_clk = hdmi_text_controller_v1_0_inst.clk_25MHz;
+     assign pixel_hs = hdmi_text_controller_v1_0_inst.hsync;
+     assign pixel_vs = hdmi_text_controller_v1_0_inst.vsync;
+     assign pixel_vde = hdmi_text_controller_v1_0_inst.vde;
     
     // DrawX and DrawY - these come from your internal VGA module
-    // assign drawX = 
-    // assign drawY =
+    assign drawX = hdmi_text_controller_v1_0_inst.drawX;
+    assign drawY =hdmi_text_controller_v1_0_inst.drawY;
+    
+    // self defined signals for debugging purposes
+    logic [31:0] control_1, frame_counter, register_value;
+    logic [9:0] register_index;
+    logic [7:0] data;    
+    logic [6:0] code;
+    logic [4:0] xpos, ypos;
+    logic [3:0] pixel_row;
+    logic vsync, reset_ah;
+
+    assign control_1 = hdmi_text_controller_v1_0_inst.control_1;
+    
+    assign register_value = hdmi_text_controller_v1_0_inst.reg_val;
+    assign register_index = hdmi_text_controller_v1_0_inst.regnum;
+    assign code = hdmi_text_controller_v1_0_inst.code;
+    assign data = hdmi_text_controller_v1_0_inst.data;
+    assign vsync = hdmi_text_controller_v1_0_inst.vsync;
+    assign xpos = hdmi_text_controller_v1_0_inst.colormapper.xpos;
+    assign ypos = hdmi_text_controller_v1_0_inst.colormapper.ypos;
+    assign reset_ah = hdmi_text_controller_v1_0_inst.reset_ah;
+    assign frame_counter = hdmi_text_controller_v1_0_inst.fra_cnt;
+    assign pixel_row = hdmi_text_controller_v1_0_inst.pix_row;
+
    
     // BMP writing task, based off work from @BrianHGinc:
     // https://github.com/BrianHGinc/SystemVerilog-TestBench-BPM-picture-generator
@@ -228,6 +252,20 @@ module hdmi_text_controller_tb();
     //Note the read handshake process is simpler than the write
     task axi_read (input logic [31:0] addr, output logic [31:0] data);
         begin
+            #3 read_addr <= addr;
+            read_addr_valid <= 1'b1;
+            read_data_ready <= 1'b1;
+            
+            wait(read_addr_ready);
+            @(posedge aclk);
+            read_addr_valid<=0;
+            
+            wait(read_data_valid);
+            @(posedge aclk);
+            data <= read_data;
+            read_data_ready <=0;
+            read_data_valid <=0;
+            @(posedge aclk);
         end
     endtask;
   
